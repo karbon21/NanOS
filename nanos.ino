@@ -1,7 +1,7 @@
 #include <WiFi.h>
-#include <SPI.h>
+//#include <FatFS.h>
+//#include <FatFSUSB.h>
 #include <XPT2046_Touchscreen.h>
-#include <SD.h>
 #include "utils.h"
 #include "keyboard.h"
 #include "Adafruit_GFX.h"
@@ -14,8 +14,15 @@
 #define TOUCH_CS 13
 #define SD_CS 17
 
-String version = "0.0.0";
+#define SCREEN_WIDTH 320
+#define SCREEN_HEIGHT 240
+#define CHAR_WIDTH 6
+#define CHAR_HEIGHT 8
+#define LINE_CHARS 53
+
+String version = "0.0.1";
 String prompt = "> ";
+double batteryCalibration = 1.01;
 
 Keyboard keyboard;
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
@@ -28,7 +35,31 @@ std::vector<String> history;
 unsigned long lastBlink = 0;
 bool blink = false;
 
-double batteryCalibration = 1.01;
+void print(String text, uint16_t color=ILI9341_WHITE) {
+	tft.setTextColor(color, ILI9341_BLACK);
+	for (int i = 0; i < text.length(); i++) {
+        if (tft.getCursorY() >= SCREEN_HEIGHT) {
+            tft.setCursor(0, 0);
+            tft.fillRect(0, 0, SCREEN_WIDTH, CHAR_HEIGHT, ILI9341_BLACK);
+        }
+
+        if (tft.getCursorX() >= LINE_CHARS * CHAR_WIDTH) {
+			if (tft.getCursorY() >= SCREEN_HEIGHT - CHAR_HEIGHT) {
+				tft.setCursor(0, 0);
+                tft.fillRect(0, 0, SCREEN_WIDTH, CHAR_HEIGHT, ILI9341_BLACK);
+			} else {
+            	tft.fillRect(0, tft.getCursorY() + CHAR_HEIGHT, SCREEN_WIDTH, CHAR_HEIGHT, ILI9341_BLACK);
+			}
+        }
+
+        tft.print(text[i]);
+
+        if (tft.getCursorX() <= 0) {
+            tft.fillRect(0, tft.getCursorY(), SCREEN_WIDTH, CHAR_HEIGHT, ILI9341_BLACK);
+        }
+	}
+	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+}
 
 float getBatteryVoltage() {
 	return analogRead(26) * batteryCalibration * 3.3 * 2.0 / 65535.0;
@@ -41,20 +72,16 @@ float getBatteryPercentage() {
 	return percentage;
 }
 
-void print(String text, uint16_t color=ILI9341_WHITE) {
-  	tft.setTextColor(color, ILI9341_BLACK);
-	tft.print(text);
-  	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
-}
-
 void displayBlink(bool isBlinking) {
-	int x = tft.getCursorX() + inputBuffer.length() * 6;
+	int x = tft.getCursorX() + inputBuffer.length() * CHAR_WIDTH;
 	int y = tft.getCursorY();
 	uint16_t color = isBlinking ? ILI9341_WHITE : ILI9341_BLACK;
-	tft.fillRect(x, y, 6, 8, color);
+	tft.fillRect(x, y, CHAR_WIDTH, CHAR_HEIGHT, color);
 }
 
 void displayInput(String input) {
+	int ry = tft.getCursorY() + CHAR_HEIGHT * ceil((float) (input.length() + prompt.length()) / LINE_CHARS);
+	tft.fillRect(0, ry, SCREEN_WIDTH, CHAR_HEIGHT, ILI9341_BLACK);
 	int x = tft.getCursorX();
 	int y = tft.getCursorY();
 	tft.print(input);
@@ -63,7 +90,7 @@ void displayInput(String input) {
 
 void clear() {
 	tft.fillScreen(ILI9341_BLACK);
-	tft.setCursor(0, -8);
+	tft.setCursor(0, -CHAR_HEIGHT);
 }
 
 void connectToWiFi() {
@@ -88,21 +115,39 @@ void execute(String &input, bool isRepeated=false) {
 
 	if (cmd == "help") {
 		print("\n-- HELP --\n", tft.color565(0, 100, 200));
-		print(" - help - shows this dialogue\n");
+		print(" - a (...) - repeats the n-th command before this command, ");
+		print("where n = the amount of arguments including initial \"a\".\n");
+		print(" - help (page) - shows help page\n");
 		print(" - me - shows information about this PC\n");
 		print(" - cl - clears the screen.\n");
+		print(" - bat - prints the current battery voltage and percentage.\n");
 		print(" - uptime - shows the uptime in milliseconds since last reboot.\n");
 		print(" - ping (address) - pings the given server.\n");
-		print(" - a (a) (a) ... - repeats the last/n before this command.\n");
 		print(" - draw - starts the graphical drawing program.\n");
-		print(" - bat - prints the current battery voltage and percentage.\n");
+		// print(" - msc - freezes the OS to enter file transfer mode.\n");
 	} else if (cmd == "me") {
 		print("NanOS version " + version + " on Raspberry Pi Pico 2 W.\n");
 	} else if (cmd == "cl") {
 		clear();
 	} else if (cmd == "uptime") {
 		print(String(millis()) + " milliseconds.\n");
-	} else if (cmd == "ping") {
+	} else if (cmd == "a") {
+		if (isRepeated) return;
+		history.pop_back();
+		int i = history.size() - args.size();
+		if (i >= 0) {
+			String command = history[i];
+			execute(command, true);
+		}
+	} else if (cmd == "bat") {
+		print("Voltage: ");
+		print(String(getBatteryVoltage()), ILI9341_BLUE);
+		print("V | Battery: ");
+		print(String(getBatteryPercentage()), ILI9341_BLUE);
+		print("%\n");
+	} /*else if (cmd == "msc") {
+
+	}*/ else if (cmd == "ping") {
 		if (args.size() == 2) {
 			if (WiFi.status() != WL_CONNECTED) connectToWiFi();
 			WiFiClient client;
@@ -117,14 +162,6 @@ void execute(String &input, bool isRepeated=false) {
 			print(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected");
 			print("\n");
 		}
-	} else if (cmd == "a") {
-		if (isRepeated) return;
-		history.pop_back();
-		int i = history.size() - args.size();
-		if (i >= 0) {
-			String command = history[i];
-			execute(command, true);
-		}
 	} else if (cmd == "draw") {
 		uint16_t color = ILI9341_BLACK;
 		int16_t size = 3;
@@ -135,8 +172,8 @@ void execute(String &input, bool isRepeated=false) {
 			if (ts.touched()) {
 				TS_Point p = ts.getPoint();
 				
-				int x = map(p.x, 3900, 365, 0, 320);
-				int y = map(p.y, 3800, 200, 0, 240);
+				int x = map(p.x, 3900, 365, 0, SCREEN_WIDTH);
+				int y = map(p.y, 3800, 200, 0, SCREEN_HEIGHT);
 				
 				tft.fillCircle(x, y, size, color);
 			}
@@ -173,21 +210,14 @@ void execute(String &input, bool isRepeated=false) {
 				}
 			}
 		}
-	} else if (cmd == "bat") {
-		print("Voltage: ");
-		print(String(getBatteryVoltage()), ILI9341_BLUE);
-		print("V | Battery: ");
-		print(String(getBatteryPercentage()), ILI9341_BLUE);
-		print("%\n");
 	}
 }
 
 void enterCommand() {
 	displayBlink(false);
-	tft.println(inputBuffer);
-	if (tft.getCursorY() >= 200) clear();
+	print(inputBuffer + "\n");
 	execute(inputBuffer);
-	tft.print("\n" + prompt);
+	print("\n" + prompt);
 }
 
 void loop() {
@@ -231,28 +261,15 @@ void setup() {
 	analogRead(26);
 	
 	Serial.begin(115200);
-	
-	// SPI.setRX(16);
-	// SPI.setSCK(18);
-	// SPI.setTX(19);
-
 	tft.begin();
 	ts.begin();
+	//FatFS.begin();
+    //FatFSUSB.begin();
 
  	tft.setRotation(1);
   	tft.setTextSize(1);
 	tft.fillScreen(ILI9341_BLACK);
 	keyboard.getKey();
-
-    // print("Connecting SD Card...\n", ILI9341_CYAN);
-	// if (SD.begin(SD_CS, SD_SCK_HZ(400000))) {
-    //     print("SD Card connected!\n", ILI9341_GREEN);
-    // } else {
-    //     print("SD Card failed!\n", ILI9341_RED);
-	// // }
-
-	// delay(500);
-	// clear();
 
   	tft.setTextColor(ILI9341_YELLOW, ILI9341_BLACK);
 	tft.println("\nWelcome to NanOS\n");
