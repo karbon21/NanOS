@@ -102,7 +102,7 @@ void connectToWiFi(String ssid, String passphrase) {
         print(".");
 		count++;
 		if (count > 10) {
-    		print("\Failed!\n", ILI9341_RED);
+    		print("\nFailed!\n", ILI9341_RED);
 			return;
 		}
     }
@@ -112,6 +112,7 @@ void connectToWiFi(String ssid, String passphrase) {
 }
 
 void help(int page) {
+	print("\n-- HELP PAGE " + String(page) + " --\n", tft.color565(0, 100, 200));
 	switch (page) {
 		case 0:
 			print(" - help (page) - shows help page (starting from 0).\n");
@@ -141,7 +142,6 @@ void execute(String &input, bool isRepeated=false) {
 	String cmd = args[0];
 
 	if (cmd == "help") {
-		print("\n-- HELP PAGE " + args[1] + " --\n", tft.color565(0, 100, 200));
 		if (args.size() == 1) {
 			help(0);
 		} else {
