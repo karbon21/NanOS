@@ -22,7 +22,7 @@
 
 String version = "0.0.1";
 String prompt = "> ";
-double batteryCalibration = 1.01;
+double batteryCalibration = 1.00;
 
 Keyboard keyboard;
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
@@ -93,16 +93,43 @@ void clear() {
 	tft.setCursor(0, -CHAR_HEIGHT);
 }
 
-void connectToWiFi() {
+void connectToWiFi(String ssid, String passphrase) {
     print("Connecting to WiFi", ILI9341_CYAN);
-    WiFi.begin("Ucom9394_2.4G", "a1b2c3d4");
+    WiFi.begin(ssid.c_str(), passphrase.c_str());
+	int count = 0;
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         print(".");
+		count++;
+		if (count > 10) {
+    		print("\Failed!\n", ILI9341_RED);
+			return;
+		}
     }
     print("\nConnected!\n", ILI9341_GREEN);
     print("IP Address: ");
     print(WiFi.localIP().toString() + "\n");
+}
+
+void help(int page) {
+	switch (page) {
+		case 0:
+			print(" - help (page) - shows help page (starting from 0).\n");
+			print(" - me - shows information about this PC\n");
+			print(" - cl - clears the screen.\n");
+			print(" - bat - prints the current battery voltage and percentage.\n");
+			print(" - uptime - shows the uptime in milliseconds since last reboot.\n");
+			print(" - wifi [ssid] [passphrase] - connects to Wi-Fi with given credentials.\n");
+			print(" - ping (address) - pings the given server.\n");
+			print(" - a (...) - repeats the n-th command before this command, ");
+			print("where n = the amount of arguments including initial \"a\".\n");
+			print(" - draw - starts the graphical drawing program.\n");
+			// print(" - msc - freezes the OS to enter file transfer mode.\n");
+			break;
+		default:
+			print(" - help page not found.\n");
+			break;
+	}
 }
 
 void execute(String &input, bool isRepeated=false) {
@@ -114,17 +141,12 @@ void execute(String &input, bool isRepeated=false) {
 	String cmd = args[0];
 
 	if (cmd == "help") {
-		print("\n-- HELP --\n", tft.color565(0, 100, 200));
-		print(" - a (...) - repeats the n-th command before this command, ");
-		print("where n = the amount of arguments including initial \"a\".\n");
-		print(" - help (page) - shows help page\n");
-		print(" - me - shows information about this PC\n");
-		print(" - cl - clears the screen.\n");
-		print(" - bat - prints the current battery voltage and percentage.\n");
-		print(" - uptime - shows the uptime in milliseconds since last reboot.\n");
-		print(" - ping (address) - pings the given server.\n");
-		print(" - draw - starts the graphical drawing program.\n");
-		// print(" - msc - freezes the OS to enter file transfer mode.\n");
+		print("\n-- HELP PAGE " + args[1] + " --\n", tft.color565(0, 100, 200));
+		if (args.size() == 1) {
+			help(0);
+		} else {
+			help(args[1].toInt());
+		}
 	} else if (cmd == "me") {
 		print("NanOS version " + version + " on Raspberry Pi Pico 2 W.\n");
 	} else if (cmd == "cl") {
@@ -147,9 +169,18 @@ void execute(String &input, bool isRepeated=false) {
 		print("%\n");
 	} /*else if (cmd == "msc") {
 
-	}*/ else if (cmd == "ping") {
+	} */else if (cmd == "wifi") {
+		if (args.size() < 2 || args.size() > 3) {
+			print("Wrong amount of arguments.\n", ILI9341_RED);
+		} else {
+			connectToWiFi(args[1], args.size() == 2 ? "" : args[2]);
+		}
+	} else if (cmd == "ping") {
 		if (args.size() == 2) {
-			if (WiFi.status() != WL_CONNECTED) connectToWiFi();
+			if (WiFi.status() != WL_CONNECTED) {
+				print("Connect to Wi-Fi first.\n", ILI9341_RED);
+				return;
+			}
 			WiFiClient client;
 			print("Checking " + args[1] + "... ");
 			if (client.connect(args[1].c_str(), 80)) {
