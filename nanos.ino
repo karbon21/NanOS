@@ -1,18 +1,27 @@
 #include <WiFi.h>
-//#include <FatFS.h>
-//#include <FatFSUSB.h>
-#include <XPT2046_Touchscreen.h>
+#include <pico/cyw43_arch.h>
+
 #include "utils.h"
 #include "keyboard.h"
+
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
+#include <XPT2046_Touchscreen.h>
 
-#define INDICATOR 20
+#include "hardware/adc.h"
+#include "hardware/gpio.h"
+
+//#include <FatFS.h>
+//#include <FatFSUSB.h>
+
 #define TFT_CS 10
 #define TFT_RST 11
 #define TFT_DC 12
 #define TOUCH_CS 13
 #define SD_CS 17
+#define INDICATOR 20
+#define WL_CS 25
+#define ADC_VSYS 29
 
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
@@ -62,11 +71,27 @@ void print(String text, uint16_t color=ILI9341_WHITE) {
 }
 
 float getBatteryVoltage() {
-	return analogRead(26) * batteryCalibration * 3.3 * 2.0 / 65535.0;
+    cyw43_thread_enter();
+
+    adc_gpio_init(ADC_VSYS);
+    adc_select_input(3);
+    gpio_put(WL_CS, true);
+
+	delay(10);
+    uint16_t raw = adc_read();
+
+    gpio_set_function(ADC_VSYS, GPIO_FUNC_PIO1);
+    gpio_init(WL_CS);
+    gpio_set_dir(WL_CS, GPIO_OUT);
+    gpio_put(WL_CS, false);
+
+    cyw43_thread_exit();
+
+	return (raw * 3.3 / 4095.0) * 3.0 * batteryCalibration;
 }
 
-float getBatteryPercentage() {
-	float percentage = (getBatteryVoltage() - 3.0) / (4.2 - 3.0) * 100.0;
+float getBatteryPercentage(float voltage) {
+	float percentage = (voltage - 3.0) / (4.2 - 3.0) * 100.0;
 	if (percentage < 0) return 0;
 	if (percentage > 100) return 100;
 	return percentage;
@@ -162,10 +187,12 @@ void execute(String &input, bool isRepeated=false) {
 			execute(command, true);
 		}
 	} else if (cmd == "bat") {
+		float v = getBatteryVoltage();
+		float p = getBatteryPercentage(v);
 		print("Voltage: ");
-		print(String(getBatteryVoltage()), ILI9341_BLUE);
+		print(String(v), ILI9341_BLUE);
 		print("V | Battery: ");
-		print(String(getBatteryPercentage()), ILI9341_BLUE);
+		print(String(p), ILI9341_BLUE);
 		print("%\n");
 	} /*else if (cmd == "msc") {
 
@@ -288,8 +315,10 @@ void setup() {
 	pinMode(INDICATOR, GPIO_OUT);
 	digitalWrite(INDICATOR, HIGH);
 
-	analogReadResolution(16);
-	analogRead(26);
+    adc_init();
+	gpio_init(WL_CS);
+	gpio_set_dir(WL_CS, GPIO_OUT);
+	gpio_put(WL_CS, false);
 	
 	Serial.begin(115200);
 	tft.begin();
