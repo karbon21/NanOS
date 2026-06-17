@@ -7,8 +7,9 @@ THIS PROJECT IS IN EXPERIMENTAL STAGE, MANY FEATURES MAY BE BROKEN AND IT'S NOT 
 ## Features
 * Keyboard Support: Full input handling via keypad or serial.
 * Terminal Interface: Built-in shell for system commands.
-* Graphical Drawing: Interactive touchscreen drawing program.
+* Battery Management: Battery voltage detection and automatic user warnings.
 * Connectivity: WiFi integration for network diagnostics.
+* Graphical Drawing: Interactive touchscreen drawing program.
 
 ## Hardware Requirements
 - Raspberry Pi Pico / Pico 2 (2 W or W recommended for full wireless compatability)
