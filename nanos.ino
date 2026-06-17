@@ -29,9 +29,9 @@
 #define CHAR_HEIGHT 8
 #define LINE_CHARS 53
 
-String version = "0.0.1";
+String version = "0.0.2";
 String prompt = "> ";
-double batteryCalibration = 1.00;
+double batteryCalibration = 1;
 
 Keyboard keyboard;
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
@@ -309,6 +309,34 @@ void loop() {
 	} else if (blink) {
 		displayBlink(false);
 	}
+}
+
+void loop1() {
+	float v = getBatteryVoltage();
+	if (v < 3.0) {
+		for (int i = 0; i < 100; i++) {
+			digitalWrite(INDICATOR, LOW);
+			delay(80);
+			digitalWrite(INDICATOR, HIGH);
+			delay(80);
+		}
+	}
+	if (v < 3.2) {
+		for (int i = 0; i < 10; i++) {
+			digitalWrite(INDICATOR, LOW);
+			delay(100);
+			digitalWrite(INDICATOR, HIGH);
+			delay(200);
+		}
+	} else if (v < 3.4) {
+		for (int i = 0; i < 5; i++) {
+			digitalWrite(INDICATOR, LOW);
+			delay(500);
+			digitalWrite(INDICATOR, HIGH);
+			delay(1000);
+		}
+	}
+	delay(10000);
 }
 
 void setup() {
