@@ -10,9 +10,10 @@
 
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
+#include "hardware/watchdog.h"
 
-//#include <FatFS.h>
-//#include <FatFSUSB.h>
+#include <FatFS.h>
+#include <FatFSUSB.h>
 
 #define TFT_CS 10
 #define TFT_RST 11
@@ -29,7 +30,7 @@
 #define CHAR_HEIGHT 8
 #define LINE_CHARS 53
 
-String version = "0.0.2";
+String version = "0.1.0";
 String prompt = "> ";
 double batteryCalibration = 1;
 
@@ -150,7 +151,7 @@ void help(int page) {
 			print(" - a (...) - repeats the n-th command before this command, ");
 			print("where n = the amount of arguments including initial \"a\".\n");
 			print(" - draw - starts the graphical drawing program.\n");
-			// print(" - msc - freezes the OS to enter file transfer mode.\n");
+			print(" - msc - freezes the OS to enter file transfer mode.\n");
 			break;
 		default:
 			print(" - help page not found.\n");
@@ -194,9 +195,17 @@ void execute(String &input, bool isRepeated=false) {
 		print("V | Battery: ");
 		print(String(p), ILI9341_BLUE);
 		print("%\n");
-	} /*else if (cmd == "msc") {
-
-	} */else if (cmd == "wifi") {
+	} else if (cmd == "msc") {
+		print("Entering Mass Storage Class Mode...\n");
+		delay(500);
+    	FatFSUSB.begin();
+		print("MSC Mode ON! After the work is done, press any key to reboot.", ILI9341_RED);
+		while (true) {
+			if (keyboard.getKey()) {
+				watchdog_reboot(0, 0, 0);
+			}
+		}
+	} else if (cmd == "wifi") {
 		if (args.size() < 2 || args.size() > 3) {
 			print("Wrong amount of arguments.\n", ILI9341_RED);
 		} else {
@@ -351,8 +360,7 @@ void setup() {
 	Serial.begin(115200);
 	tft.begin();
 	ts.begin();
-	//FatFS.begin();
-    //FatFSUSB.begin();
+	FatFS.begin();
 
  	tft.setRotation(1);
   	tft.setTextSize(1);
@@ -360,7 +368,11 @@ void setup() {
 	keyboard.getKey();
 
   	tft.setTextColor(ILI9341_YELLOW, ILI9341_BLACK);
-	tft.println("\nWelcome to NanOS\n");
+	tft.print("\nWelcome to NanOS ");
+  	tft.setTextColor(ILI9341_CYAN, ILI9341_BLACK);
+	tft.print("v");
+	tft.print(version);
+	tft.println("!\n");
   	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
 
 	tft.print(prompt);
