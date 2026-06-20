@@ -119,6 +119,15 @@ void clear() {
 	tft.setCursor(0, -CHAR_HEIGHT);
 }
 
+void verifyFilesystem() {
+	if (!FatFS.exists("/system")) {
+		FatFS.mkdir("/system");
+	}
+	if (!FatFS.exists("/user")) {
+		FatFS.mkdir("/user");
+	}
+}
+
 void connectToWiFi(String ssid, String passphrase) {
     print("Connecting to WiFi", ILI9341_CYAN);
     WiFi.begin(ssid.c_str(), passphrase.c_str());
@@ -357,24 +366,26 @@ void setup() {
 	gpio_set_dir(WL_CS, GPIO_OUT);
 	gpio_put(WL_CS, false);
 	
-	Serial.begin(115200);
 	tft.begin();
 	ts.begin();
-	FatFS.begin();
-
  	tft.setRotation(1);
   	tft.setTextSize(1);
 	tft.fillScreen(ILI9341_BLACK);
+
+	tft.println("Initializing Serial on 115200 baud rate");
+	Serial.begin(115200);
+
+	tft.println("Initializing Filesystem");
+	FatFS.begin();
+
+	tft.println("Verifying Filesystem");
+	verifyFilesystem();
+
+	clear();
+	print("\nWelcome to NanOS ", ILI9341_YELLOW);
+	print("v" + version + "!\n\n", ILI9341_CYAN);
+
 	keyboard.getKey();
-
-  	tft.setTextColor(ILI9341_YELLOW, ILI9341_BLACK);
-	tft.print("\nWelcome to NanOS ");
-  	tft.setTextColor(ILI9341_CYAN, ILI9341_BLACK);
-	tft.print("v");
-	tft.print(version);
-	tft.println("!\n");
-  	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
-
 	tft.print(prompt);
 	inputMode = true;
 }
