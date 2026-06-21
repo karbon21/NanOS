@@ -120,11 +120,20 @@ void clear() {
 }
 
 void verifyFilesystem() {
-	if (!FatFS.exists("/system")) {
-		FatFS.mkdir("/system");
+	std::array requiredFolders = {"/system", "/user"};
+
+	for (int i = 0; i < requiredFolders.size(); i++) {
+		if (!FatFS.exists(requiredFolders[i])) {
+			FatFS.mkdir(requiredFolders[i]);
+		}
 	}
-	if (!FatFS.exists("/user")) {
-		FatFS.mkdir("/user");
+
+	Dir root = FatFS.openDir("/");
+	while (root.next()) {
+		const char* path = ("/" + root.fileName()).c_str();
+        if (!contains(requiredFolders, path)) {
+			FatFS.remove(path);
+        }
 	}
 }
 
@@ -286,6 +295,8 @@ void execute(String &input, bool isRepeated=false) {
 				}
 			}
 		}
+	} else {
+		print("Command not found!\n", ILI9341_RED);
 	}
 }
 
@@ -380,6 +391,8 @@ void setup() {
 
 	tft.println("Verifying Filesystem");
 	verifyFilesystem();
+
+	delay(200);
 
 	clear();
 	print("\nWelcome to NanOS ", ILI9341_YELLOW);
