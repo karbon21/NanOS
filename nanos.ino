@@ -47,7 +47,7 @@ std::vector<String> history;
 unsigned long lastBlink = 0;
 bool blink = false;
 
-String location = "/user/";
+String location = "/user";
 
 void print(String text, uint16_t color=ILI9341_WHITE) {
 	tft.setTextColor(color, ILI9341_BLACK);
@@ -123,6 +123,41 @@ void clear() {
 	tft.setCursor(0, -CHAR_HEIGHT);
 }
 
+String joinPaths(const String& path1, const String& path2) {
+	if (path1.isEmpty()) return path2;
+    if (path2.isEmpty()) return path1;
+
+    bool p1HasSlash = path1.endsWith("/");
+    bool p2HasSlash = path2.startsWith("/");
+
+    if (p1HasSlash && p2HasSlash) {
+        return path1 + path2.substring(1);
+    } else if (!p1HasSlash && !p2HasSlash) {
+        return path1 + "/" + path2;
+    } else {
+        return path1 + path2;
+    }
+}
+
+bool removeRecursive(String path) {
+    Dir dir = FatFS.openDir(path);
+    while (dir.next()) {
+        String fileName = dir.fileName();
+        String fullPath = path + "/" + fileName;
+
+        Dir subCheck = FatFS.openDir(fullPath);
+        bool isDir = subCheck.isDirectory();
+
+        if (isDir) {
+            removeRecursive(fullPath); 
+        } else {
+            FatFS.remove(fullPath); 
+        }
+    }
+    
+    return FatFS.remove(path);
+}
+
 void verifyFilesystem() {
 	std::array<String, 4> requiredDirectories = {"/system", "/system/config", "/system/stats", "/user"};
 
@@ -136,7 +171,11 @@ void verifyFilesystem() {
 	while (root.next()) {
 		String path = "/" + root.fileName();
         if (!contains(requiredDirectories, path)) {
-			FatFS.remove(path);
+			if (root.isFile()) {
+				FatFS.remove(path);
+			} else if (root.isDirectory()) {
+				removeRecursive(path);
+			}
         }
 	}
 }
@@ -168,11 +207,14 @@ void help(int page) {
 			print(" - cl - clears the screen.\n");
 			print(" - bat - prints the current battery voltage and percentage.\n");
 			print(" - upt - prints the uptime in milliseconds since last reboot.\n");
-			print(" - loc - prints the current location in the filsystem.\n");
+			print(" - loc - prints the current directory (location).\n");
+			print(" - ls - lists the contents the current directory.\n");
+			print(" - cd [directory] - changes the current directory.\n");
 			print(" - a (...) - repeats the n-th command before this command, ");
 			print("where n = the amount of arguments including initial \"a\".\n");
 			break;
 		case 1:
+			print(" - rm [path] - recursively deletes a file or directory.\n");
 			print(" - wifi [ssid] [passphrase] - connects to Wi-Fi.\n");
 			print(" - ping (address) - pings the given server.\n");
 			print(" - msc - freezes the OS to enter file transfer mode.\n");
@@ -205,6 +247,46 @@ void execute(String &input, bool isRepeated=false) {
 		print(String(millis()) + " milliseconds.\n");
 	} else if (cmd == "loc") {
 		print(location + "\n");
+	} else if (cmd == "ls") {
+		Dir root = FatFS.openDir(location);
+		while (root.next()) {
+			print(root.fileName() + "\n");
+		}
+	} else if (cmd == "cd") {
+		if (args.size() == 2) {
+			String original = location;
+			if (args[1][0] == '/') {
+				location = args[1];
+			} else {
+				location = joinPaths(original, args[1]);
+			}
+			if (location != "/" && !FatFS.exists(location)) {
+				location = original;
+			}
+		}
+	} else if (cmd == "rm") {
+		if (args.size() != 2) {
+            print("Please specify the path of the file/folder to be removed.", ILI9341_RED);
+        } else {
+            String target = args[1];
+            
+            if (!target.startsWith("/")) {
+                String baseLoc = location;
+                if (!baseLoc.endsWith("/")) baseLoc += "/";
+                target = baseLoc + target;
+            }
+
+            if (!FatFS.exists(target)) {
+                print("Error: Path not found.\n", ILI9341_RED);
+            } else {
+                print("Removing " + target + "...\n");
+                if (removeRecursive(target)) {
+                    print("Deleted successfully.\n", ILI9341_GREEN);
+                } else {
+                    print("Failed to delete.\n", ILI9341_RED);
+                }
+            }
+		}
 	} else if (cmd == "a") {
 		if (isRepeated) return;
 		history.pop_back();
