@@ -14,6 +14,7 @@
 
 #include <FatFS.h>
 #include <FatFSUSB.h>
+//#include <FileConfig.h>
 
 #define TFT_CS 10
 #define TFT_RST 11
@@ -37,6 +38,7 @@ double batteryCalibration = 1;
 Keyboard keyboard;
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
 XPT2046_Touchscreen ts(TOUCH_CS);
+//FileConfig cfg;
 
 String inputBuffer = "";
 bool inputMode = false;
@@ -44,6 +46,8 @@ std::vector<String> history;
 
 unsigned long lastBlink = 0;
 bool blink = false;
+
+String location = "/user/";
 
 void print(String text, uint16_t color=ILI9341_WHITE) {
 	tft.setTextColor(color, ILI9341_BLACK);
@@ -120,18 +124,18 @@ void clear() {
 }
 
 void verifyFilesystem() {
-	std::array requiredFolders = {"/system", "/user"};
+	std::array<String, 4> requiredDirectories = {"/system", "/system/config", "/system/stats", "/user"};
 
-	for (int i = 0; i < requiredFolders.size(); i++) {
-		if (!FatFS.exists(requiredFolders[i])) {
-			FatFS.mkdir(requiredFolders[i]);
+	for (String dir : requiredDirectories) {
+		if (!FatFS.exists(dir)) {
+			FatFS.mkdir(dir);
 		}
 	}
 
 	Dir root = FatFS.openDir("/");
 	while (root.next()) {
-		const char* path = ("/" + root.fileName()).c_str();
-        if (!contains(requiredFolders, path)) {
+		String path = "/" + root.fileName();
+        if (!contains(requiredDirectories, path)) {
 			FatFS.remove(path);
         }
 	}
@@ -160,20 +164,22 @@ void help(int page) {
 	switch (page) {
 		case 0:
 			print(" - help (page) - shows help page (starting from 0).\n");
-			print(" - me - shows information about this PC\n");
+			print(" - me - displays information about this PC\n");
 			print(" - cl - clears the screen.\n");
 			print(" - bat - prints the current battery voltage and percentage.\n");
-			print(" - uptime - shows the uptime in milliseconds since last reboot.\n");
-			print(" - wifi [ssid] [passphrase] - connects to Wi-Fi with given credentials.\n");
-			print(" - ping (address) - pings the given server.\n");
+			print(" - upt - prints the uptime in milliseconds since last reboot.\n");
+			print(" - loc - prints the current location in the filsystem.\n");
 			print(" - a (...) - repeats the n-th command before this command, ");
 			print("where n = the amount of arguments including initial \"a\".\n");
-			print(" - draw - starts the graphical drawing program.\n");
+			break;
+		case 1:
+			print(" - wifi [ssid] [passphrase] - connects to Wi-Fi.\n");
+			print(" - ping (address) - pings the given server.\n");
 			print(" - msc - freezes the OS to enter file transfer mode.\n");
+			print(" - draw - starts the graphical drawing program.\n");
 			break;
 		default:
 			print(" - help page not found.\n");
-			break;
 	}
 }
 
@@ -195,8 +201,10 @@ void execute(String &input, bool isRepeated=false) {
 		print("NanOS version " + version + " on Raspberry Pi Pico 2 W.\n");
 	} else if (cmd == "cl") {
 		clear();
-	} else if (cmd == "uptime") {
+	} else if (cmd == "upt") {
 		print(String(millis()) + " milliseconds.\n");
+	} else if (cmd == "loc") {
+		print(location + "\n");
 	} else if (cmd == "a") {
 		if (isRepeated) return;
 		history.pop_back();
