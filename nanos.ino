@@ -124,19 +124,44 @@ void clear() {
 }
 
 String normalizePath(String path) {
-    if (path.length() == 0) {
-        return "";
+	if (path.length() == 0) return "/";
+
+    std::vector<String> parts;
+    int startIndex = 0;
+
+    while (startIndex < path.length()) {
+        int slashIndex = path.indexOf('/', startIndex);
+        String part;
+
+        if (slashIndex == -1) {
+            part = path.substring(startIndex);
+            startIndex = path.length();
+        } else {
+            part = path.substring(startIndex, slashIndex);
+            startIndex = slashIndex + 1;
+        }
+
+        if (part == "" || part == ".") {
+            continue;
+        } else if (part == "..") {
+            if (!parts.empty()) {
+                parts.pop_back();
+            }
+        } else {
+            parts.push_back(part);
+        }
     }
 
-    while (path.indexOf("//") != -1) {
-        path.replace("//", "/");
+    String result = "";
+    for (const String& p : parts) {
+        result += "/" + p;
     }
 
-    if (path.length() > 1 && path.endsWith("/")) {
-        path.remove(path.length() - 1);
+    if (result == "") {
+        return "/";
     }
 
-    return path;
+    return result;
 }
 
 String joinPaths(const String& path1, const String& path2) {
@@ -260,16 +285,16 @@ void execute(String &input, bool isRepeated=false) {
 		}
 	} else if (cmd == "cd") {
 		if (args.size() == 2) {
-			String original = location;
+            String target;
 
 			if (args[1].startsWith("/")) {
-				location = normalizePath(args[1]);
+				target = normalizePath(args[1]);
 			} else {
-				location = joinPaths(original, args[1]);
+				target = joinPaths(location, args[1]);
 			}
 			
-			if (location != "/" && !FatFS.exists(location)) {
-				location = original;
+			if (target == "/" || FatFS.exists(target)) {
+				location = target;
 			}
 		}
 	} else if (cmd == "rm") {
