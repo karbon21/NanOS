@@ -123,38 +123,44 @@ void clear() {
 	tft.setCursor(0, -CHAR_HEIGHT);
 }
 
+String normalizePath(String path) {
+    if (path.length() == 0) {
+        return "";
+    }
+
+    while (path.indexOf("//") != -1) {
+        path.replace("//", "/");
+    }
+
+    if (path.length() > 1 && path.endsWith("/")) {
+        path.remove(path.length() - 1);
+    }
+
+    return path;
+}
+
 String joinPaths(const String& path1, const String& path2) {
 	if (path1.isEmpty()) return path2;
     if (path2.isEmpty()) return path1;
 
-    bool p1HasSlash = path1.endsWith("/");
-    bool p2HasSlash = path2.startsWith("/");
-
-    if (p1HasSlash && p2HasSlash) {
-        return path1 + path2.substring(1);
-    } else if (!p1HasSlash && !p2HasSlash) {
-        return path1 + "/" + path2;
-    } else {
-        return path1 + path2;
-    }
+    return normalizePath(path1 + "/" + path2);
 }
 
 bool removeRecursive(String path) {
+	path = normalizePath(path);
     Dir dir = FatFS.openDir(path);
+
     while (dir.next()) {
         String fileName = dir.fileName();
-        String fullPath = path + "/" + fileName;
+        String fullPath = joinPaths(path, fileName);
 
-        Dir subCheck = FatFS.openDir(fullPath);
-        bool isDir = subCheck.isDirectory();
-
-        if (isDir) {
+        if (dir.isDirectory()) {
             removeRecursive(fullPath); 
         } else {
             FatFS.remove(fullPath); 
         }
     }
-    
+
     return FatFS.remove(path);
 }
 
@@ -255,31 +261,34 @@ void execute(String &input, bool isRepeated=false) {
 	} else if (cmd == "cd") {
 		if (args.size() == 2) {
 			String original = location;
-			if (args[1][0] == '/') {
-				location = args[1];
+
+			if (args[1].startsWith("/")) {
+				location = normalizePath(args[1]);
 			} else {
 				location = joinPaths(original, args[1]);
 			}
+			
 			if (location != "/" && !FatFS.exists(location)) {
 				location = original;
 			}
 		}
 	} else if (cmd == "rm") {
 		if (args.size() != 2) {
-            print("Please specify the path of the file/folder to be removed.", ILI9341_RED);
+            print("Please specify the path of the file/folder to be removed.\n", ILI9341_RED);
         } else {
-            String target = args[1];
+            String target;
             
-            if (!target.startsWith("/")) {
-                String baseLoc = location;
-                if (!baseLoc.endsWith("/")) baseLoc += "/";
-                target = baseLoc + target;
-            }
+            if (args[1].startsWith("/")) {
+				target = normalizePath(args[1]);
+            } else {
+				target = joinPaths(location, args[1]);
+			}
 
             if (!FatFS.exists(target)) {
                 print("Error: Path not found.\n", ILI9341_RED);
             } else {
                 print("Removing " + target + "...\n");
+
                 if (removeRecursive(target)) {
                     print("Deleted successfully.\n", ILI9341_GREEN);
                 } else {
