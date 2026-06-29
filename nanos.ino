@@ -14,7 +14,6 @@
 
 #include <FatFS.h>
 #include <FatFSUSB.h>
-//#include <FileConfig.h>
 
 #define TFT_CS 10
 #define TFT_RST 11
@@ -38,7 +37,6 @@ double batteryCalibration = 1;
 Keyboard keyboard;
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
 XPT2046_Touchscreen ts(TOUCH_CS);
-//FileConfig cfg;
 
 String inputBuffer = "";
 bool inputMode = false;
@@ -73,54 +71,6 @@ void print(String text, uint16_t color=ILI9341_WHITE) {
         }
 	}
 	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
-}
-
-float getBatteryVoltage() {
-    cyw43_thread_enter();
-
-    adc_gpio_init(ADC_VSYS);
-    adc_select_input(3);
-    gpio_put(WL_CS, true);
-
-	delay(10);
-    uint16_t raw = adc_read();
-
-    gpio_set_function(ADC_VSYS, GPIO_FUNC_PIO1);
-    gpio_init(WL_CS);
-    gpio_set_dir(WL_CS, GPIO_OUT);
-    gpio_put(WL_CS, false);
-
-    cyw43_thread_exit();
-
-	return (raw * 3.3 / 4095.0) * 3.0 * batteryCalibration;
-}
-
-float getBatteryPercentage(float voltage) {
-	float percentage = (voltage - 3.0) / (4.2 - 3.0) * 100.0;
-	if (percentage < 0) return 0;
-	if (percentage > 100) return 100;
-	return percentage;
-}
-
-void displayBlink(bool isBlinking) {
-	int x = tft.getCursorX() + inputBuffer.length() * CHAR_WIDTH;
-	int y = tft.getCursorY();
-	uint16_t color = isBlinking ? ILI9341_WHITE : ILI9341_BLACK;
-	tft.fillRect(x, y, CHAR_WIDTH, CHAR_HEIGHT, color);
-}
-
-void displayInput(String input) {
-	int ry = tft.getCursorY() + CHAR_HEIGHT * ceil((float) (input.length() + prompt.length()) / LINE_CHARS);
-	tft.fillRect(0, ry, SCREEN_WIDTH, CHAR_HEIGHT, ILI9341_BLACK);
-	int x = tft.getCursorX();
-	int y = tft.getCursorY();
-	tft.print(input);
-	tft.setCursor(x, y);
-}
-
-void clear() {
-	tft.fillScreen(ILI9341_BLACK);
-	tft.setCursor(0, -CHAR_HEIGHT);
 }
 
 String normalizePath(String path) {
@@ -187,6 +137,73 @@ bool removeRecursive(String path) {
     }
 
     return FatFS.remove(path);
+}
+
+String configPath(String path) {
+	return joinPaths("/system/config", path) + ".nconf";
+}
+
+void setConfig(String path, String value) {
+	String fullPath = configPath(path);
+	File file = FatFS.open(fullPath, "w");
+	file.print(value);
+	file.close();
+}
+
+String getConfig(String path) {
+	String fullPath = configPath(path);
+	File file = FatFS.open(fullPath, "r");
+	String str = file.readString();
+	file.close();
+	return str;
+}
+
+float getBatteryVoltage() {
+    cyw43_thread_enter();
+
+    adc_gpio_init(ADC_VSYS);
+    adc_select_input(3);
+    gpio_put(WL_CS, true);
+
+	delay(10);
+    uint16_t raw = adc_read();
+
+    gpio_set_function(ADC_VSYS, GPIO_FUNC_PIO1);
+    gpio_init(WL_CS);
+    gpio_set_dir(WL_CS, GPIO_OUT);
+    gpio_put(WL_CS, false);
+
+    cyw43_thread_exit();
+
+	return (raw * 3.3 / 4095.0) * 3.0 * batteryCalibration;
+}
+
+float getBatteryPercentage(float voltage) {
+	float percentage = (voltage - 3.0) / (4.2 - 3.0) * 100.0;
+	if (percentage < 0) return 0;
+	if (percentage > 100) return 100;
+	return percentage;
+}
+
+void displayBlink(bool isBlinking) {
+	int x = tft.getCursorX() + inputBuffer.length() * CHAR_WIDTH;
+	int y = tft.getCursorY();
+	uint16_t color = isBlinking ? ILI9341_WHITE : ILI9341_BLACK;
+	tft.fillRect(x, y, CHAR_WIDTH, CHAR_HEIGHT, color);
+}
+
+void displayInput(String input) {
+	int ry = tft.getCursorY() + CHAR_HEIGHT * ceil((float) (input.length() + prompt.length()) / LINE_CHARS);
+	tft.fillRect(0, ry, SCREEN_WIDTH, CHAR_HEIGHT, ILI9341_BLACK);
+	int x = tft.getCursorX();
+	int y = tft.getCursorY();
+	tft.print(input);
+	tft.setCursor(x, y);
+}
+
+void clear() {
+	tft.fillScreen(ILI9341_BLACK);
+	tft.setCursor(0, -CHAR_HEIGHT);
 }
 
 void verifyFilesystem() {
