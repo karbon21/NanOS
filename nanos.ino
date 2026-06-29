@@ -228,22 +228,26 @@ void verifyFilesystem() {
 	}
 }
 
-void connectToWiFi(String ssid, String passphrase) {
-    print("Connecting to WiFi", ILI9341_CYAN);
+bool connectToWiFi(String ssid, String passphrase) {
     WiFi.begin(ssid.c_str(), passphrase.c_str());
 	int count = 0;
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
-        print(".");
 		count++;
 		if (count > 10) {
-    		print("\nFailed!\n", ILI9341_RED);
-			return;
+			return false;
 		}
     }
-    print("\nConnected!\n", ILI9341_GREEN);
-    print("IP Address: ");
-    print(WiFi.localIP().toString() + "\n");
+	setConfig("wifi/ssid", ssid);
+	setConfig("wifi/pass", passphrase);
+	return true;
+}
+
+bool connectToWiFi() {
+	String ssid = getConfig("wifi/ssid");
+	String pass = getConfig("wifi/pass");
+	if (ssid == "") return false;
+	return connectToWiFi(ssid, pass);
 }
 
 void help(int page) {
@@ -365,16 +369,33 @@ void execute(String &input, bool isRepeated=false) {
 			}
 		}
 	} else if (cmd == "wifi") {
-		if (args.size() < 2 || args.size() > 3) {
+		if (args.size() > 3) {
 			print("Wrong amount of arguments.\n", ILI9341_RED);
 		} else {
-			connectToWiFi(args[1], args.size() == 2 ? "" : args[2]);
+    		print("Connecting to WiFi...\n", ILI9341_CYAN);
+
+			bool success;
+			if (args.size() == 1) {
+				success = connectToWiFi();
+			} else {
+				success = connectToWiFi(args[1], args.size() == 2 ? "" : args[2]);
+			}
+			
+			if (success) {
+				print("Connected!\n", ILI9341_GREEN);
+				print("IP Address: ");
+				print(WiFi.localIP().toString() + "\n");
+			} else {
+    			print("Failed!\n", ILI9341_RED);
+			}
 		}
 	} else if (cmd == "ping") {
 		if (args.size() == 2) {
 			if (WiFi.status() != WL_CONNECTED) {
-				print("Connect to Wi-Fi first.\n", ILI9341_RED);
-				return;
+				if (!connectToWiFi()) {
+					print("Connect to Wi-Fi first.\n", ILI9341_RED);
+					return;
+				}
 			}
 			WiFiClient client;
 			print("Checking " + args[1] + "... ");
