@@ -264,10 +264,11 @@ void help(int page) {
 			print(" - cd [directory] - changes the current directory.\n");
 			print(" - a (...) - repeats the n-th command before this command, ");
 			print("where n = the amount of arguments including initial \"a\".\n");
+			print(" - rb - reboots NanOS.\n");
 			break;
 		case 1:
 			print(" - rm [path] - recursively deletes a file or directory.\n");
-			print(" - wifi [ssid] [passphrase] - connects to Wi-Fi.\n");
+			print(" - wifi (ssid) (passphrase) - connects to Wi-Fi.\n");
 			print(" - ping (address) - pings the given server.\n");
 			print(" - msc - freezes the OS to enter file transfer mode.\n");
 			print(" - draw - starts the graphical drawing program.\n");
@@ -297,6 +298,8 @@ void execute(String &input, bool isRepeated=false) {
 		clear();
 	} else if (cmd == "upt") {
 		print(String(millis()) + " milliseconds.\n");
+	} else if (cmd == "rb") {
+		watchdog_reboot(0, 0, 0);
 	} else if (cmd == "loc") {
 		print(location + "\n");
 	} else if (cmd == "ls") {
@@ -365,6 +368,7 @@ void execute(String &input, bool isRepeated=false) {
 		print("MSC Mode ON! After the work is done, press any key to reboot.", ILI9341_RED);
 		while (true) {
 			if (keyboard.getKey()) {
+				FatFSUSB.end();
 				watchdog_reboot(0, 0, 0);
 			}
 		}
@@ -475,6 +479,7 @@ void loop() {
 			String command = Serial.readString();
 			inputBuffer = command;
 			enterCommand();
+			displayInput(inputBuffer);
 		}
 
 		char key = keyboard.getKey();
