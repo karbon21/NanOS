@@ -47,7 +47,7 @@ bool blink = false;
 
 String location = "/user";
 
-void print(String text, uint16_t color=ILI9341_WHITE) {
+void print(const String& text, uint16_t color=ILI9341_WHITE) {
 	tft.setTextColor(color, ILI9341_BLACK);
 	for (int i = 0; i < text.length(); i++) {
         if (tft.getCursorY() >= SCREEN_HEIGHT) {
@@ -73,7 +73,7 @@ void print(String text, uint16_t color=ILI9341_WHITE) {
 	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
 }
 
-String normalizePath(String path) {
+String normalizePath(const String& path) {
 	if (path.length() == 0) return "/";
 
     std::vector<String> parts;
@@ -119,6 +119,18 @@ String joinPaths(const String& path1, const String& path2) {
     if (path2.isEmpty()) return path1;
 
     return normalizePath(path1 + "/" + path2);
+}
+
+String resolvePath(const String& path) {
+	String resolved;
+
+	if (path.startsWith("/")) {
+		resolved = normalizePath(path);
+	} else {
+		resolved = joinPaths(location, path);
+	}
+
+	return resolved;
 }
 
 bool removeRecursive(String path) {
@@ -309,13 +321,7 @@ void execute(String &input, bool isRepeated=false) {
 		}
 	} else if (cmd == "cd") {
 		if (args.size() == 2) {
-            String target;
-
-			if (args[1].startsWith("/")) {
-				target = normalizePath(args[1]);
-			} else {
-				target = joinPaths(location, args[1]);
-			}
+            String target = resolvePath(args[1]);
 			
 			if (target == "/" || FatFS.exists(target)) {
 				location = target;
@@ -325,13 +331,7 @@ void execute(String &input, bool isRepeated=false) {
 		if (args.size() != 2) {
             print("Please specify the path of the file/folder to be removed.\n", ILI9341_RED);
         } else {
-            String target;
-            
-            if (args[1].startsWith("/")) {
-				target = normalizePath(args[1]);
-            } else {
-				target = joinPaths(location, args[1]);
-			}
+            String target = resolvePath(args[1]);
 
             if (!FatFS.exists(target)) {
                 print("Error: Path not found.\n", ILI9341_RED);
@@ -545,10 +545,12 @@ void setup() {
 	gpio_put(WL_CS, false);
 	
 	tft.begin();
-	ts.begin();
+	tft.setSPISpeed(50000000);
  	tft.setRotation(1);
   	tft.setTextSize(1);
 	tft.fillScreen(ILI9341_BLACK);
+
+	ts.begin();
 
 	tft.println("Initializing Serial on 115200 baud rate");
 	Serial.begin(115200);
