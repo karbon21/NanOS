@@ -302,6 +302,7 @@ void help(int page) {
 			print(" - msc - freezes the OS to enter file transfer mode.\n");
 			print(" - draw - starts the graphical drawing program.\n");
 			print(" - jpg [path] - draws a JPG image on the screen.\n");
+			print(" - anim [directory] - animates JPGs inside a directory.\n");
 			break;
 		default:
 			print(" - help page not found.\n");
@@ -438,7 +439,7 @@ void execute(String &input, bool isRepeated=false) {
             String target = resolvePath(args[1]);
 
             if (!FatFS.exists(target)) {
-                print("Error: Path not found.\n", ILI9341_RED);
+                print("Error: File not found.\n", ILI9341_RED);
             } else {
 				tft.fillScreen(ILI9341_BLACK);
 				drawJPG(target);
@@ -449,6 +450,35 @@ void execute(String &input, bool isRepeated=false) {
 						clear();
 						break;
 					}
+				}
+            }
+		}
+	} else if (cmd == "anim") {
+		if (args.size() != 2) {
+            print("Please specify the directory of the animation.\n", ILI9341_RED);
+        } else {
+            String target = resolvePath(args[1]);
+
+            if (!FatFS.exists(target)) {
+                print("Error: Directory not found.\n", ILI9341_RED);
+            } else {
+				Dir root = FatFS.openDir(target);
+
+				tft.fillScreen(ILI9341_BLACK);
+
+				while (true) {
+					while (root.next()) {
+						char key = keyboard.getKey(true);
+						if (key == '*') {
+							clear();
+							return;
+						}
+
+						if (!root.isFile()) continue;
+
+						drawJPG(joinPaths(target, root.fileName()));
+					}
+					root.rewind();
 				}
             }
 		}
