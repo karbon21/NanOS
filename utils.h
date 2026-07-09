@@ -1,12 +1,11 @@
-#ifndef UTILS_H
-#define UTILS_S
+#pragma once
 
 #include <vector>
 #include <array>
 #include <algorithm>
 
 template <typename T, std::size_t N>
-bool contains(const std::array<T, N>& arr, const auto& target) {
+bool contains(const std::array<T, N>& arr, const T& target) {
     auto it = std::find(std::begin(arr), std::end(arr), target);
     return it != std::end(arr);
 }
@@ -38,5 +37,3 @@ std::vector<String> splitString(String input) {
 
 	return results;
 }
-
-#endif

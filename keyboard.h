@@ -1,5 +1,4 @@
-#ifndef KEYBOARD_H
-#define KEYBOARD_H
+#pragma once
 
 #include <Keypad.h>
 
@@ -79,5 +78,3 @@ class Keyboard {
 			return '\0';
 		}
 };
-
-#endif

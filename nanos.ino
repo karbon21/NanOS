@@ -3,6 +3,7 @@
 
 #include "utils.h"
 #include "keyboard.h"
+#include "jpg.h"
 
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
@@ -284,6 +285,7 @@ void help(int page) {
 			print(" - ping (address) - pings the given server.\n");
 			print(" - msc - freezes the OS to enter file transfer mode.\n");
 			print(" - draw - starts the graphical drawing program.\n");
+			print(" - jpg [path] - draws a JPG image on the screen.\n");
 			break;
 		default:
 			print(" - help page not found.\n");
@@ -412,6 +414,27 @@ void execute(String &input, bool isRepeated=false) {
 		} else {
 			print(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected");
 			print("\n");
+		}
+	} else if (cmd == "jpg") {
+		if (args.size() != 2) {
+            print("Please specify the path of the JPG file to be rendered.\n", ILI9341_RED);
+        } else {
+            String target = resolvePath(args[1]);
+
+            if (!FatFS.exists(target)) {
+                print("Error: Path not found.\n", ILI9341_RED);
+            } else {
+				tft.fillScreen(ILI9341_BLACK);
+				drawJPG(target);
+
+				while (true) {
+					char key = keyboard.getKey(true);
+					if (key == '*') {
+						clear();
+						break;
+					}
+				}
+            }
 		}
 	} else if (cmd == "draw") {
 		uint16_t color = ILI9341_BLACK;
