@@ -32,8 +32,6 @@
 #define LINE_CHARS 53
 
 String version = "0.1.0";
-String prompt = "> ";
-double batteryCalibration = 1;
 
 Keyboard keyboard;
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
@@ -46,7 +44,9 @@ std::vector<String> history;
 unsigned long lastBlink = 0;
 bool blink = false;
 
-String location = "/user";
+double batteryCalibration;
+String prompt;
+String location;
 
 void print(const String& text, uint16_t color=ILI9341_WHITE) {
 	tft.setTextColor(color, ILI9341_BLACK);
@@ -156,7 +156,13 @@ String configPath(String path) {
 	return joinPaths("/system/config", path) + ".nconf";
 }
 
-void setConfig(String path, String value) {
+bool configExists(String path) {
+	String fullPath = configPath(path);
+	return FatFS.exists(fullPath);
+}
+
+void setConfig(String path, String value, bool override=true) {
+	if (configExists(path) && !override) return;
 	String fullPath = configPath(path);
 	File file = FatFS.open(fullPath, "w");
 	file.print(value);
@@ -164,6 +170,7 @@ void setConfig(String path, String value) {
 }
 
 String getConfig(String path) {
+	if (!configExists(path)) return "";
 	String fullPath = configPath(path);
 	File file = FatFS.open(fullPath, "r");
 	String str = file.readString();
@@ -219,6 +226,13 @@ void clear() {
 	tft.setCursor(0, -CHAR_HEIGHT);
 }
 
+void defaultConfigs() {
+	setConfig("startup/delay", "200", false);
+	setConfig("battery/calibration", "1", false);
+	setConfig("terminal/prompt", "> ", false);
+	setConfig("fs/home", "/user", false);
+}
+
 void verifyFilesystem() {
 	std::array<String, 4> requiredDirectories = {"/system", "/system/config", "/system/stats", "/user"};
 
@@ -239,6 +253,8 @@ void verifyFilesystem() {
 			}
         }
 	}
+
+	defaultConfigs();
 }
 
 bool connectToWiFi(String ssid, String passphrase) {
@@ -532,27 +548,29 @@ void loop() {
 
 void loop1() {
 	float v = getBatteryVoltage();
-	if (v < 3.0) {
-		for (int i = 0; i < 100; i++) {
-			digitalWrite(INDICATOR, LOW);
-			delay(80);
-			digitalWrite(INDICATOR, HIGH);
-			delay(80);
+	if (v != 0) {
+		if (v < 3.0) {
+			for (int i = 0; i < 100; i++) {
+				digitalWrite(INDICATOR, LOW);
+				delay(80);
+				digitalWrite(INDICATOR, HIGH);
+				delay(80);
+			}
 		}
-	}
-	if (v < 3.2) {
-		for (int i = 0; i < 10; i++) {
-			digitalWrite(INDICATOR, LOW);
-			delay(100);
-			digitalWrite(INDICATOR, HIGH);
-			delay(200);
-		}
-	} else if (v < 3.4) {
-		for (int i = 0; i < 5; i++) {
-			digitalWrite(INDICATOR, LOW);
-			delay(500);
-			digitalWrite(INDICATOR, HIGH);
-			delay(1000);
+		if (v < 3.2) {
+			for (int i = 0; i < 10; i++) {
+				digitalWrite(INDICATOR, LOW);
+				delay(100);
+				digitalWrite(INDICATOR, HIGH);
+				delay(200);
+			}
+		} else if (v < 3.4) {
+			for (int i = 0; i < 5; i++) {
+				digitalWrite(INDICATOR, LOW);
+				delay(500);
+				digitalWrite(INDICATOR, HIGH);
+				delay(1000);
+			}
 		}
 	}
 	delay(10000);
@@ -584,7 +602,12 @@ void setup() {
 	tft.println("Verifying Filesystem");
 	verifyFilesystem();
 
-	delay(200);
+	tft.println("Loading Configurations");
+	batteryCalibration = getConfig("battery/calibration").toDouble();
+	prompt = getConfig("terminal/prompt");
+	location = getConfig("fs/home");
+
+	delay(getConfig("startup/delay").toInt());
 
 	clear();
 	print("\nWelcome to NanOS ", ILI9341_YELLOW);
