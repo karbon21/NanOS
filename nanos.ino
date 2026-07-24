@@ -22,6 +22,7 @@
 #define TOUCH_CS 13
 #define SD_CS 17
 #define INDICATOR 20
+#define TFT_LED 21
 #define WL_CS 25
 #define ADC_VSYS 29
 
@@ -288,18 +289,19 @@ void help(int page) {
 			print(" - cl - clears the screen.\n");
 			print(" - bat - prints the current battery voltage and percentage.\n");
 			print(" - upt - prints the uptime in milliseconds since last reboot.\n");
-			print(" - loc - prints the current directory (location).\n");
-			print(" - ls - lists the contents the current directory.\n");
-			print(" - cd [directory] - changes the current directory.\n");
 			print(" - a (...) - repeats the n-th command before this command, ");
 			print("where n = the amount of arguments including initial \"a\".\n");
+			print(" - br [0-255] - changes screen brightness.\n");
 			print(" - rb - reboots NanOS.\n");
 			break;
 		case 1:
+			print(" - loc - prints the current directory (location).\n");
+			print(" - ls - lists the contents the current directory.\n");
+			print(" - cd [directory] - changes the current directory.\n");
 			print(" - rm [path] - recursively deletes a file or directory.\n");
+			print(" - msc - freezes the OS to enter file transfer mode.\n");
 			print(" - wifi (ssid) (passphrase) - connects to Wi-Fi.\n");
 			print(" - ping (address) - pings the given server.\n");
-			print(" - msc - freezes the OS to enter file transfer mode.\n");
 			print(" - draw - starts the graphical drawing program.\n");
 			print(" - jpg [path] - draws a JPG image on the screen.\n");
 			print(" - anim [directory] - animates JPGs inside a directory.\n");
@@ -329,6 +331,9 @@ void execute(String &input, bool isRepeated=false) {
 		clear();
 	} else if (cmd == "upt") {
 		print(String(millis()) + " milliseconds.\n");
+	} else if (cmd == "br") {
+		if (args.size() != 2) print("Please provide the screen brightness from 0 to 255.\n", ILI9341_RED);
+		else analogWrite(TFT_LED, args[1].toInt());
 	} else if (cmd == "rb") {
 		watchdog_reboot(0, 0, 0);
 	} else if (cmd == "loc") {
@@ -609,6 +614,10 @@ void loop1() {
 void setup() {
 	pinMode(INDICATOR, GPIO_OUT);
 	digitalWrite(INDICATOR, HIGH);
+
+	pinMode(TFT_LED, OUTPUT);
+	analogWriteFreq(1000);
+    analogWrite(TFT_LED, 255);
 
     adc_init();
 	gpio_init(WL_CS);
