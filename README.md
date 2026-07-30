@@ -7,17 +7,18 @@ THIS PROJECT IS IN EXPERIMENTAL STAGE, MANY FEATURES MAY BE BROKEN AND IT'S NOT 
 ## Features
 * Input handling via keypad or serial.
 * Interactive shell for system commands.
-* Battery voltage detection and automatic warnings for low battery levels.
-* Filesystem support for NanOS system configuration files and user data.
+* Battery management for safety.
+* Persistent filesystem for NanOS system configuration files and user data.
 * WiFi integration (For Pico W/2W models).
 
 ## Hardware Requirements
 - Raspberry Pi Pico / Pico 2 (2 W or W recommended for wireless compatability)
 - ILI9341 TFT Display
-- XPT2046 Touchscreen Controller (Optional)
+- XPT2046 Touchscreen Controller (Recommended)
 - External Keypad (Optional)
+- LED Indicator + 470 Ohm Resistor wired to pin 20 (Optional)
 - 18650 Battery (Optional)
-- LED Indicator (Optional)
+- TP4056 Charging Board (Recommended if using a battery)
 
 ## Getting Started
 ### Install the latest version
@@ -36,6 +37,8 @@ THIS PROJECT IS IN EXPERIMENTAL STAGE, MANY FEATURES MAY BE BROKEN AND IT'S NOT 
 Once booted, the terminal will appear. Start by typing help to explore the environment.
 
 ## 🎉 Bonus Features 🎉
+* Screen brightness control (Connect TFT's LED pin to Pico's pin 21)
 * A built-in interactive drawing program
 * Built-in support for JPG images
+* JPG sequence animation support
 * File transfer mode compatible with Windows, MacOS and Linux.
