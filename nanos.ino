@@ -347,9 +347,22 @@ void execute(String &input, bool isRepeated=false) {
 		if (args.size() == 2) {
             String target = resolvePath(args[1]);
 			
-			if (target == "/" || FatFS.exists(target)) {
+			if (target == "/") {
 				location = target;
+			} else if (FatFS.exists(target)) {
+				File file = FatFS.open(target, "r");
+
+				if (!file) {
+					location = target;
+				} else {
+					file.close();
+					print("Couldn't change directory: Target is a file.\n", ILI9341_RED);
+				}
+			} else {
+				print("Couldn't change directory: Target doesn't exist.\n", ILI9341_RED);
 			}
+		} else {
+			print("Couldn't change directory: Wrong argument count.\n", ILI9341_RED);
 		}
 	} else if (cmd == "rm") {
 		if (args.size() != 2) {
