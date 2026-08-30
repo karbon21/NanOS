@@ -4,6 +4,10 @@
 #include "utils.h"
 #include "keyboard.h"
 #include "jpg.h"
+#include "nedit.h"
+#include "config.h"
+#include "path.h"
+#include "const.h"
 
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
@@ -25,14 +29,6 @@
 #define TFT_LED 21
 #define WL_CS 25
 #define ADC_VSYS 29
-
-#define SCREEN_WIDTH 320
-#define SCREEN_HEIGHT 240
-#define CHAR_WIDTH 6
-#define CHAR_HEIGHT 8
-#define LINE_CHARS 53
-
-String version = "0.1.0";
 
 Keyboard keyboard;
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST);
@@ -75,54 +71,6 @@ void print(const String& text, uint16_t color=ILI9341_WHITE) {
 	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
 }
 
-String normalizePath(const String& path) {
-	if (path.length() == 0) return "/";
-
-    std::vector<String> parts;
-    int startIndex = 0;
-
-    while (startIndex < path.length()) {
-        int slashIndex = path.indexOf('/', startIndex);
-        String part;
-
-        if (slashIndex == -1) {
-            part = path.substring(startIndex);
-            startIndex = path.length();
-        } else {
-            part = path.substring(startIndex, slashIndex);
-            startIndex = slashIndex + 1;
-        }
-
-        if (part == "" || part == ".") {
-            continue;
-        } else if (part == "..") {
-            if (!parts.empty()) {
-                parts.pop_back();
-            }
-        } else {
-            parts.push_back(part);
-        }
-    }
-
-    String result = "";
-    for (const String& p : parts) {
-        result += "/" + p;
-    }
-
-    if (result == "") {
-        return "/";
-    }
-
-    return result;
-}
-
-String joinPaths(const String& path1, const String& path2) {
-	if (path1.isEmpty()) return path2;
-    if (path2.isEmpty()) return path1;
-
-    return normalizePath(path1 + "/" + path2);
-}
-
 String resolvePath(const String& path) {
 	String resolved;
 
@@ -135,13 +83,13 @@ String resolvePath(const String& path) {
 	return resolved;
 }
 
-bool removeRecursive(String path) {
-	path = normalizePath(path);
-    Dir dir = FatFS.openDir(path);
+bool removeRecursive(const String& path) {
+	String normPath = normalizePath(path);
+    Dir dir = FatFS.openDir(normPath);
 
     while (dir.next()) {
         String fileName = dir.fileName();
-        String fullPath = joinPaths(path, fileName);
+        String fullPath = joinPaths(normPath, fileName);
 
         if (dir.isDirectory()) {
             removeRecursive(fullPath); 
@@ -150,33 +98,7 @@ bool removeRecursive(String path) {
         }
     }
 
-    return FatFS.remove(path);
-}
-
-String configPath(String path) {
-	return joinPaths("/system/config", path) + ".nconf";
-}
-
-bool configExists(String path) {
-	String fullPath = configPath(path);
-	return FatFS.exists(fullPath);
-}
-
-void setConfig(String path, String value, bool override=true) {
-	if (configExists(path) && !override) return;
-	String fullPath = configPath(path);
-	File file = FatFS.open(fullPath, "w");
-	file.print(value);
-	file.close();
-}
-
-String getConfig(String path) {
-	if (!configExists(path)) return "";
-	String fullPath = configPath(path);
-	File file = FatFS.open(fullPath, "r");
-	String str = file.readString();
-	file.close();
-	return str;
+    return FatFS.remove(normPath);
 }
 
 float getBatteryVoltage() {
@@ -232,6 +154,10 @@ void defaultConfigs() {
 	setConfig("battery/calibration", "1", false);
 	setConfig("terminal/prompt", "> ", false);
 	setConfig("fs/home", "/user", false);
+	setConfig("touch/left", "3900", false);
+	setConfig("touch/right", "365", false);
+	setConfig("touch/top", "3800", false);
+	setConfig("touch/bottom", "200", false);
 }
 
 void verifyFilesystem() {
@@ -300,8 +226,11 @@ void help(int page) {
 			print(" - cd [directory] - changes the current directory.\n");
 			print(" - rm [path] - recursively deletes a file or directory.\n");
 			print(" - msc - freezes the OS to enter file transfer mode.\n");
+			print(" - ned [path] - starts the NEdit text editor.\n");
 			print(" - wifi (ssid) (passphrase) - connects to Wi-Fi.\n");
 			print(" - ping (address) - pings the given server.\n");
+			break;
+		case 2:
 			print(" - draw - starts the graphical drawing program.\n");
 			print(" - jpg [path] - draws a JPG image on the screen.\n");
 			print(" - anim [directory] - animates JPGs inside a directory.\n");
@@ -319,7 +248,15 @@ void execute(String &input, bool isRepeated=false) {
 	input = "";
 	String cmd = args[0];
 
-	if (cmd == "help") {
+	if (cmd == "a") {
+		if (isRepeated) return;
+		history.pop_back();
+		int i = history.size() - args.size();
+		if (i >= 0) {
+			String command = history[i];
+			execute(command, true);
+		}
+	} else if (cmd == "help") {
 		if (args.size() == 1) {
 			help(0);
 		} else {
@@ -382,13 +319,27 @@ void execute(String &input, bool isRepeated=false) {
                 }
             }
 		}
-	} else if (cmd == "a") {
-		if (isRepeated) return;
-		history.pop_back();
-		int i = history.size() - args.size();
-		if (i >= 0) {
-			String command = history[i];
-			execute(command, true);
+	} else if (cmd == "ned") {
+		if (args.size() == 2) {
+            String target = resolvePath(args[1]);
+
+			if (FatFS.exists(target)) {
+				File file = FatFS.open(target, "r");
+
+				if (!file) {
+					print("NEdit: Target is not a file.\n", ILI9341_RED);
+					return;
+				} else file.close();
+				
+			} else if (target == "/") {
+				print("NEdit: Can't edit '/'.\n", ILI9341_RED);
+				return;
+			}
+			
+			runEditor(target, tft, ts, keyboard);
+			clear();
+		} else {
+			print("NEdit: Must specify path.\n", ILI9341_RED);
 		}
 	} else if (cmd == "bat") {
 		float v = getBatteryVoltage();
@@ -506,12 +457,17 @@ void execute(String &input, bool isRepeated=false) {
 
 		tft.fillScreen(ILI9341_WHITE);
 
+		int left = getConfig("touch/left").toInt();
+		int right = getConfig("touch/right").toInt();
+		int top = getConfig("touch/top").toInt();
+		int bottom = getConfig("touch/bottom").toInt();
+
 		while (true) {
 			if (ts.touched()) {
 				TS_Point p = ts.getPoint();
 				
-				int x = map(p.x, 3900, 365, 0, SCREEN_WIDTH);
-				int y = map(p.y, 3800, 200, 0, SCREEN_HEIGHT);
+				int x = map(p.x, left, right, 0, SCREEN_WIDTH);
+				int y = map(p.y, top, bottom, 0, SCREEN_HEIGHT);
 				
 				tft.fillCircle(x, y, size, color);
 			}

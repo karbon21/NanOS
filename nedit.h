@@ -1,0 +1,157 @@
+#pragma once
+
+#include <Arduino.h>
+#include <FatFS.h>
+#include "Adafruit_GFX.h"
+#include "Adafruit_ILI9341.h"
+#include <XPT2046_Touchscreen.h>
+#include "keyboard.h"
+#include "config.h"
+#include "const.h"
+
+const String neditVersion = "1.0";
+
+void printCursor(uint16_t color) {
+	tft.fillRect(tft.getCursorX(), tft.getCursorY(), CHAR_WIDTH, CHAR_HEIGHT, color);
+}
+
+void runEditor(const String& path, Adafruit_ILI9341& tft, XPT2046_Touchscreen& ts, Keyboard& keyboard) {
+	tft.fillScreen(ILI9341_BLACK);
+	tft.fillRect(0, 0, SCREEN_WIDTH, CHAR_HEIGHT, ILI9341_BLUE);
+	tft.setCursor(0, 0);
+    tft.setTextColor(ILI9341_ORANGE, ILI9341_BLUE);
+    tft.print("NEdit v");
+	tft.print(neditVersion);
+	tft.print(" - ");
+
+	String fileContent = "";
+
+    File file = FatFS.open(path, "r");
+    if (file) {
+        fileContent = file.readString();
+        file.close();
+		tft.print("Loaded File\n");
+    } else tft.print("New File\n");
+    tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+	tft.setCursor(0, CHAR_HEIGHT);
+	tft.print(fileContent);
+	tft.setTextWrap(false);
+
+	//file = FatFS.open(path, "w");
+
+	bool editMode = false;
+	bool initial = true;
+
+	int prevX = 0;
+	int prevY = 0;
+	int scrollX = 0;
+	int scrollY = 0;
+	
+	int left = getConfig("touch/left").toInt();
+	int right = getConfig("touch/right").toInt();
+	int top = getConfig("touch/top").toInt();
+	int bottom = getConfig("touch/bottom").toInt();
+
+	while (true) {
+		if (editMode) {
+			if (ts.touched() || initial) {
+				TS_Point p = ts.getPoint();
+				
+				int x = initial ? 0 : map(p.x, left, right, 0, SCREEN_WIDTH);
+				int y = initial ? 0 : map(p.y, top, bottom, 0, SCREEN_HEIGHT);
+
+				if (x >= 10 && x <= 30 && y <= SCREEN_HEIGHT - 10 && y >= SCREEN_HEIGHT - 30) {/*save*/}
+				if (x >= SCREEN_WIDTH - 30 && x <= SCREEN_WIDTH - 10 && y <= SCREEN_HEIGHT - 10 && y >= SCREEN_HEIGHT - 30) {
+					editMode = false;
+					initial = true;
+					continue;
+				}
+
+				if (prevX) scrollX += x - prevX;
+				if (prevY) scrollY += y - prevY;
+
+				if (scrollX > 0) scrollX = 0;
+				if (scrollY > 0) scrollY = 0;
+
+				prevX = x;
+				prevY = y;
+
+				if (initial) {
+					scrollX = 0;
+					scrollY = 0;
+				}
+
+				initial = false;
+
+				int targetCol = (x - scrollX) / CHAR_WIDTH;
+				int targetRow = (y - scrollY) / CHAR_HEIGHT;
+
+				int currentCol = 0;
+				int currentRow = 0;
+				
+				int length = fileContent.length();
+				int index = length;
+
+				for (int i = 0; i < length; i++) {
+					if (fileContent[i] == '\n') {
+						if (currentRow == targetRow) {
+							index = i;
+							break;
+						}
+						currentRow++;
+						currentCol = 0;
+					} else {
+						if (currentCol == targetCol && currentRow == targetRow) {
+							index = i;
+							break;
+						}
+						currentCol++;
+					}
+				}
+
+				tft.fillScreen(ILI9341_BLACK);
+
+				tft.setCursor(scrollX, scrollY);
+				for (int i = 0; i < length; i++) {
+					uint16_t color = i == index ? ILI9341_LIGHTGREY : ILI9341_BLACK;
+					tft.setTextColor(ILI9341_WHITE, color);
+					if (fileContent[i] == '\n') {
+						printCursor(color);
+						tft.setCursor(scrollX, tft.getCursorY() + CHAR_HEIGHT);
+					}
+					else tft.print(fileContent[i]);
+				}
+				if (index == length) printCursor(ILI9341_LIGHTGREY);
+				tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+
+				tft.fillRect(10, SCREEN_HEIGHT - 30, 20, 20, ILI9341_GREENYELLOW);
+				tft.fillRect(SCREEN_WIDTH - 30, SCREEN_HEIGHT - 30, 20, 20, ILI9341_RED);
+			} else {
+				prevX = 0;
+				prevY = 0;
+			}
+
+			char key = keyboard.getKey();
+			if (key) {
+				if (key == '\b') {
+					// remove
+				} else {
+					// add
+				}
+			}
+		} else {
+			tft.setTextColor(ILI9341_CYAN, ILI9341_DARKGREEN);
+			tft.setCursor(SCREEN_WIDTH / 2 - 27 * CHAR_WIDTH / 2, SCREEN_HEIGHT / 2 - CHAR_HEIGHT);
+			tft.println("Press 5 to enter edit mode.");
+			tft.setCursor(SCREEN_WIDTH / 2 - 17 * CHAR_WIDTH / 2, SCREEN_HEIGHT / 2);
+			tft.println("Press * to leave.");
+			char key = keyboard.getKey(true);
+			if (key == '5') editMode = true;
+			else if (key == '*') {
+				//file.close();
+				break;
+			}
+		}
+	}
+	tft.setTextWrap(true);
+}
