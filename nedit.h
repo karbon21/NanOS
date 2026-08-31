@@ -104,12 +104,14 @@ void runEditor(const String& path, Adafruit_ILI9341& tft, XPT2046_Touchscreen& t
 							
 							char key = keyboard.getKey(true);
 							if (key == '#') {
+								save(path, fileContent);
+
 								tft.setTextColor(ILI9341_GREEN, ILI9341_BLACK);
 								tft.setCursor(SCREEN_WIDTH / 2 - 6 * CHAR_WIDTH / 2, SCREEN_HEIGHT - CHAR_HEIGHT);
 								tft.print("Saved!");
 								tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
 
-								save(path, fileContent);
+								delay(100);
 								break;
 							} else if (key == '*') break;
 						}
