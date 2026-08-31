@@ -51,62 +51,63 @@ void runEditor(const String& path, Adafruit_ILI9341& tft, XPT2046_Touchscreen& t
 	int right = getConfig("touch/right").toInt();
 	int top = getConfig("touch/top").toInt();
 	int bottom = getConfig("touch/bottom").toInt();
+	
+	int length = fileContent.length();
+	int index = length;
 
 	while (true) {
 		if (editMode) {
 			if (ts.touched() || initial) {
-				TS_Point p = ts.getPoint();
-				
-				int x = initial ? 0 : map(p.x, left, right, 0, SCREEN_WIDTH);
-				int y = initial ? 0 : map(p.y, top, bottom, 0, SCREEN_HEIGHT);
+				if (!initial) {
+					TS_Point p = ts.getPoint();
+					
+					int x = map(p.x, left, right, 0, SCREEN_WIDTH);
+					int y = map(p.y, top, bottom, 0, SCREEN_HEIGHT);
 
-				if (x >= 10 && x <= 30 && y <= SCREEN_HEIGHT - 10 && y >= SCREEN_HEIGHT - 30) {/*save*/}
-				if (x >= SCREEN_WIDTH - 30 && x <= SCREEN_WIDTH - 10 && y <= SCREEN_HEIGHT - 10 && y >= SCREEN_HEIGHT - 30) {
-					editMode = false;
-					initial = true;
-					continue;
-				}
+					if (x >= 10 && x <= 30 && y <= SCREEN_HEIGHT - 10 && y >= SCREEN_HEIGHT - 30) {/*save*/}
+					if (x >= SCREEN_WIDTH - 30 && x <= SCREEN_WIDTH - 10 && y <= SCREEN_HEIGHT - 10 && y >= SCREEN_HEIGHT - 30) {
+						editMode = false;
+						initial = true;
+						continue;
+					}
 
-				if (prevX) scrollX += x - prevX;
-				if (prevY) scrollY += y - prevY;
+					if (prevX) scrollX += x - prevX;
+					if (prevY) scrollY += y - prevY;
 
-				if (scrollX > 0) scrollX = 0;
-				if (scrollY > 0) scrollY = 0;
+					if (scrollX > 0) scrollX = 0;
+					if (scrollY > 0) scrollY = 0;
 
-				prevX = x;
-				prevY = y;
+					prevX = x;
+					prevY = y;
+					
+					int targetCol = (x - scrollX) / CHAR_WIDTH;
+					int targetRow = (y - scrollY) / CHAR_HEIGHT;
 
-				if (initial) {
+					int currentCol = 0;
+					int currentRow = 0;
+					
+					length = fileContent.length();
+					index = length;
+
+					for (int i = 0; i < length; i++) {
+						if (fileContent[i] == '\n') {
+							if (currentRow == targetRow) {
+								index = i;
+								break;
+							}
+							currentRow++;
+							currentCol = 0;
+						} else {
+							if (currentCol == targetCol && currentRow == targetRow) {
+								index = i;
+								break;
+							}
+							currentCol++;
+						}
+					}
+				} else {
 					scrollX = 0;
 					scrollY = 0;
-				}
-
-				initial = false;
-
-				int targetCol = (x - scrollX) / CHAR_WIDTH;
-				int targetRow = (y - scrollY) / CHAR_HEIGHT;
-
-				int currentCol = 0;
-				int currentRow = 0;
-				
-				int length = fileContent.length();
-				int index = length;
-
-				for (int i = 0; i < length; i++) {
-					if (fileContent[i] == '\n') {
-						if (currentRow == targetRow) {
-							index = i;
-							break;
-						}
-						currentRow++;
-						currentCol = 0;
-					} else {
-						if (currentCol == targetCol && currentRow == targetRow) {
-							index = i;
-							break;
-						}
-						currentCol++;
-					}
 				}
 
 				tft.fillScreen(ILI9341_BLACK);
@@ -126,6 +127,8 @@ void runEditor(const String& path, Adafruit_ILI9341& tft, XPT2046_Touchscreen& t
 
 				tft.fillRect(10, SCREEN_HEIGHT - 30, 20, 20, ILI9341_GREENYELLOW);
 				tft.fillRect(SCREEN_WIDTH - 30, SCREEN_HEIGHT - 30, 20, 20, ILI9341_RED);
+				
+				initial = false;
 			} else {
 				prevX = 0;
 				prevY = 0;
@@ -134,9 +137,17 @@ void runEditor(const String& path, Adafruit_ILI9341& tft, XPT2046_Touchscreen& t
 			char key = keyboard.getKey();
 			if (key) {
 				if (key == '\b') {
-					// remove
+					if (index > 0) {
+						fileContent = fileContent.substring(0, index - 1) + fileContent.substring(index, length);
+						initial = true;
+						length--;
+						index--;
+					}
 				} else {
-					// add
+					fileContent = fileContent.substring(0, index) + key + fileContent.substring(index, length);
+					initial = true;
+					length++;
+					index++;
 				}
 			}
 		} else {
