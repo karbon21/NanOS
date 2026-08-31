@@ -11,6 +11,12 @@
 
 const String neditVersion = "1.0";
 
+void save(const String& path, const String& fileContent) {
+	File file = FatFS.open(path, "w");
+	file.print(fileContent);
+	file.close();
+}
+
 void printCursor(uint16_t color) {
 	tft.fillRect(tft.getCursorX(), tft.getCursorY(), CHAR_WIDTH, CHAR_HEIGHT, color);
 }
@@ -63,9 +69,50 @@ void runEditor(const String& path, Adafruit_ILI9341& tft, XPT2046_Touchscreen& t
 					int y = map(p.y, top, bottom, 0, SCREEN_HEIGHT);
 
 					if (x >= 10 && x <= 30 && y <= SCREEN_HEIGHT - 10 && y >= SCREEN_HEIGHT - 30) {
-						file = FatFS.open(path, "w");
-						file.print(fileContent);
-						file.close();
+						bool draw = true;
+						while (true) {
+							if (draw) {
+								tft.fillScreen(ILI9341_BLACK);
+								tft.setCursor(0, 0);
+								tft.setTextSize(3);
+
+								tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+								tft.print("Press ");
+								tft.setTextColor(ILI9341_BLUE, ILI9341_BLACK);
+								tft.print("#");
+								tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+								tft.print(" to ");
+								tft.setTextColor(ILI9341_GREEN, ILI9341_BLACK);
+								tft.print("save");
+								tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+								tft.println(".");
+
+								tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+								tft.print("Press ");
+								tft.setTextColor(ILI9341_BLUE, ILI9341_BLACK);
+								tft.print("*");
+								tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+								tft.print(" to ");
+								tft.setTextColor(ILI9341_RED, ILI9341_BLACK);
+								tft.print("cancel");
+								tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+								tft.println(".");
+
+								tft.setTextSize(1);
+								draw = false;
+							}
+							
+							char key = keyboard.getKey(true);
+							if (key == '#') {
+								tft.setTextColor(ILI9341_GREEN, ILI9341_BLACK);
+								tft.setCursor(SCREEN_WIDTH / 2 - 6 * CHAR_WIDTH / 2, SCREEN_HEIGHT - CHAR_HEIGHT);
+								tft.print("Saved!");
+								tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+
+								save(path, fileContent);
+								break;
+							} else if (key == '*') break;
+						}
 					} else if (x >= SCREEN_WIDTH - 30 && x <= SCREEN_WIDTH - 10 && y <= SCREEN_HEIGHT - 10 && y >= SCREEN_HEIGHT - 30) {
 						editMode = false;
 						initial = true;
