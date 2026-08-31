@@ -37,8 +37,6 @@ void runEditor(const String& path, Adafruit_ILI9341& tft, XPT2046_Touchscreen& t
 	tft.print(fileContent);
 	tft.setTextWrap(false);
 
-	//file = FatFS.open(path, "w");
-
 	bool editMode = false;
 	bool initial = true;
 
@@ -64,8 +62,11 @@ void runEditor(const String& path, Adafruit_ILI9341& tft, XPT2046_Touchscreen& t
 					int x = map(p.x, left, right, 0, SCREEN_WIDTH);
 					int y = map(p.y, top, bottom, 0, SCREEN_HEIGHT);
 
-					if (x >= 10 && x <= 30 && y <= SCREEN_HEIGHT - 10 && y >= SCREEN_HEIGHT - 30) {/*save*/}
-					if (x >= SCREEN_WIDTH - 30 && x <= SCREEN_WIDTH - 10 && y <= SCREEN_HEIGHT - 10 && y >= SCREEN_HEIGHT - 30) {
+					if (x >= 10 && x <= 30 && y <= SCREEN_HEIGHT - 10 && y >= SCREEN_HEIGHT - 30) {
+						file = FatFS.open(path, "w");
+						file.print(fileContent);
+						file.close();
+					} else if (x >= SCREEN_WIDTH - 30 && x <= SCREEN_WIDTH - 10 && y <= SCREEN_HEIGHT - 10 && y >= SCREEN_HEIGHT - 30) {
 						editMode = false;
 						initial = true;
 						continue;
@@ -159,7 +160,6 @@ void runEditor(const String& path, Adafruit_ILI9341& tft, XPT2046_Touchscreen& t
 			char key = keyboard.getKey(true);
 			if (key == '5') editMode = true;
 			else if (key == '*') {
-				//file.close();
 				break;
 			}
 		}
