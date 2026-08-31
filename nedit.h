@@ -153,9 +153,6 @@ void runEditor(const String& path, Adafruit_ILI9341& tft, XPT2046_Touchscreen& t
 							currentCol++;
 						}
 					}
-				} else {
-					scrollX = 0;
-					scrollY = 0;
 				}
 
 				tft.fillScreen(ILI9341_BLACK);
