@@ -6,4 +6,4 @@
 #define CHAR_HEIGHT 8
 #define LINE_CHARS 53
 
-const String version = "0.1.1";
+const String version = "0.1.2";

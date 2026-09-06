@@ -550,36 +550,6 @@ void loop() {
 	}
 }
 
-void loop1() {
-	float v = getBatteryVoltage();
-	if (v != 0) {
-		if (v < 3.0) {
-			for (int i = 0; i < 100; i++) {
-				digitalWrite(INDICATOR, LOW);
-				delay(80);
-				digitalWrite(INDICATOR, HIGH);
-				delay(80);
-			}
-		}
-		if (v < 3.2) {
-			for (int i = 0; i < 10; i++) {
-				digitalWrite(INDICATOR, LOW);
-				delay(100);
-				digitalWrite(INDICATOR, HIGH);
-				delay(200);
-			}
-		} else if (v < 3.4) {
-			for (int i = 0; i < 5; i++) {
-				digitalWrite(INDICATOR, LOW);
-				delay(500);
-				digitalWrite(INDICATOR, HIGH);
-				delay(1000);
-			}
-		}
-	}
-	delay(10000);
-}
-
 void setup() {
 	pinMode(INDICATOR, GPIO_OUT);
 	digitalWrite(INDICATOR, HIGH);
