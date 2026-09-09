@@ -4,10 +4,14 @@
 #include <array>
 #include <algorithm>
 
-template <typename T, std::size_t N>
+template <typename T, size_t N>
 bool contains(const std::array<T, N>& arr, const T& target) {
     auto it = std::find(std::begin(arr), std::end(arr), target);
     return it != std::end(arr);
+}
+
+int countChars(const String& str, char c) {
+	return std::count(str.c_str(), str.c_str() + str.length(), c);
 }
 
 std::vector<String> splitString(String input) {

@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <pico/cyw43_arch.h>
+#include <HTTPClient.h>
 
 #include "utils.h"
 #include "keyboard.h"
@@ -229,6 +230,7 @@ void help(int page) {
 			print(" - ned [path] - starts the NEdit text editor.\n");
 			print(" - wifi (ssid) (passphrase) - connects to Wi-Fi.\n");
 			print(" - ping (address) - pings the given server.\n");
+			print(" - get (host) - sends a get request to the host.\n");
 			break;
 		case 2:
 			print(" - draw - starts the graphical drawing program.\n");
@@ -400,6 +402,58 @@ void execute(String &input, bool isRepeated=false) {
 		} else {
 			print(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected");
 			print("\n");
+		}
+	} else if (cmd == "get") {
+		if (args.size() == 2) {
+			if (WiFi.status() != WL_CONNECTED) {
+				if (!connectToWiFi()) {
+					print("Connect to Wi-Fi first.\n", ILI9341_RED);
+					return;
+				}
+			}
+			
+			HTTPClient http;
+			http.begin("http://" + args[1]);
+			int httpCode = http.GET();
+
+			int size = http.getSize();
+			String payload = "[size too big]";
+			if (size < 65,536) {
+				payload = http.getString();
+			}
+
+			int len = payload.length();
+			if (len > 256) {
+				payload = payload.substring(0, 128) + "\n\n...\n\n" + payload.substring(len - 128, len);
+			}
+
+			http.end();
+
+			uint16_t color;
+			switch (httpCode / 100) {
+				case 1:
+					color = ILI9341_BLUE;
+					break;
+				case 2:
+					color = ILI9341_GREEN;
+					break;
+				case 3:
+					color = ILI9341_YELLOW;
+					break;
+				case 4:
+					color = ILI9341_ORANGE;
+					break;
+				case 5:
+					color = ILI9341_RED;
+					break;
+				default: color = ILI9341_WHITE;
+			}
+
+			print(String(httpCode), color);
+			print("\n");
+			print(String(payload));
+		} else {
+			print("Wrong argument count.\n", ILI9341_RED);
 		}
 	} else if (cmd == "jpg") {
 		if (args.size() != 2) {
