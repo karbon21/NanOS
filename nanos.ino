@@ -242,6 +242,15 @@ void help(int page) {
 	}
 }
 
+bool checkArgsSize(std::vector<String>& args, size_t expectedSize) {
+	if (args.size() != expectedSize) {
+		String contents = String(expectedSize - 1) + " arguments, but got " + String(args.size() - 1);
+		print("Wrong argument count. (Expected " + contents + ")\n", ILI9341_RED);
+		return false;
+	}
+	return true;
+}
+
 void execute(String &input, bool isRepeated=false) {
 	input.trim();
 	if (input == "") return;
@@ -271,8 +280,8 @@ void execute(String &input, bool isRepeated=false) {
 	} else if (cmd == "upt") {
 		print(String(millis()) + " milliseconds.\n");
 	} else if (cmd == "br") {
-		if (args.size() != 2) print("Please provide the screen brightness from 0 to 255.\n", ILI9341_RED);
-		else analogWrite(TFT_LED, args[1].toInt());
+		if (!checkArgsSize(args, 2)) return;
+		analogWrite(TFT_LED, args[1].toInt());
 	} else if (cmd == "rb") {
 		watchdog_reboot(0, 0, 0);
 	} else if (cmd == "loc") {
@@ -283,66 +292,60 @@ void execute(String &input, bool isRepeated=false) {
 			print(root.fileName() + "\n");
 		}
 	} else if (cmd == "cd") {
-		if (args.size() == 2) {
-            String target = resolvePath(args[1]);
-			
-			if (target == "/") {
-				location = target;
-			} else if (FatFS.exists(target)) {
-				File file = FatFS.open(target, "r");
+		if (!checkArgsSize(args, 2)) return;
 
-				if (!file) {
-					location = target;
-				} else {
-					file.close();
-					print("Couldn't change directory: Target is a file.\n", ILI9341_RED);
-				}
+		String target = resolvePath(args[1]);
+
+		if (target == "/") {
+			location = target;
+		} else if (FatFS.exists(target)) {
+			File file = FatFS.open(target, "r");
+
+			if (!file) {
+				location = target;
 			} else {
-				print("Couldn't change directory: Target doesn't exist.\n", ILI9341_RED);
+				file.close();
+				print("Couldn't change directory: Target is a file.\n", ILI9341_RED);
 			}
 		} else {
-			print("Couldn't change directory: Wrong argument count.\n", ILI9341_RED);
+			print("Couldn't change directory: Target doesn't exist.\n", ILI9341_RED);
 		}
 	} else if (cmd == "rm") {
-		if (args.size() != 2) {
-            print("Please specify the path of the file/folder to be removed.\n", ILI9341_RED);
-        } else {
-            String target = resolvePath(args[1]);
+		if (!checkArgsSize(args, 2)) return;
 
-            if (!FatFS.exists(target)) {
-                print("Error: Path not found.\n", ILI9341_RED);
-            } else {
-                print("Removing " + target + "...\n");
+		String target = resolvePath(args[1]);
 
-                if (removeRecursive(target)) {
-                    print("Deleted successfully.\n", ILI9341_GREEN);
-                } else {
-                    print("Failed to delete.\n", ILI9341_RED);
-                }
-            }
+		if (!FatFS.exists(target)) {
+			print("Error: Path not found.\n", ILI9341_RED);
+		} else {
+			print("Removing " + target + "...\n");
+
+			if (removeRecursive(target)) {
+				print("Deleted successfully.\n", ILI9341_GREEN);
+			} else {
+				print("Failed to delete.\n", ILI9341_RED);
+			}
 		}
 	} else if (cmd == "ned") {
-		if (args.size() == 2) {
-            String target = resolvePath(args[1]);
+		if (!checkArgsSize(args, 2)) return;
 
-			if (FatFS.exists(target)) {
-				File file = FatFS.open(target, "r");
+		String target = resolvePath(args[1]);
 
-				if (!file) {
-					print("NEdit: Target is not a file.\n", ILI9341_RED);
-					return;
-				} else file.close();
-				
-			} else if (target == "/") {
-				print("NEdit: Can't edit '/'.\n", ILI9341_RED);
+		if (FatFS.exists(target)) {
+			File file = FatFS.open(target, "r");
+
+			if (!file) {
+				print("NEdit: Target is not a file.\n", ILI9341_RED);
 				return;
-			}
+			} else file.close();
 			
-			runEditor(target, tft, ts, keyboard);
-			clear();
-		} else {
-			print("NEdit: Must specify path.\n", ILI9341_RED);
+		} else if (target == "/") {
+			print("NEdit: Can't edit '/'.\n", ILI9341_RED);
+			return;
 		}
+		
+		runEditor(target, tft, ts, keyboard);
+		clear();
 	} else if (cmd == "bat") {
 		float v = getBatteryVoltage();
 		float p = getBatteryPercentage(v);
@@ -404,106 +407,100 @@ void execute(String &input, bool isRepeated=false) {
 			print("\n");
 		}
 	} else if (cmd == "get") {
-		if (args.size() == 2) {
-			if (WiFi.status() != WL_CONNECTED) {
-				if (!connectToWiFi()) {
-					print("Connect to Wi-Fi first.\n", ILI9341_RED);
-					return;
+		if (!checkArgsSize(args, 2)) return;
+
+		if (WiFi.status() != WL_CONNECTED) {
+			if (!connectToWiFi()) {
+				print("Connect to Wi-Fi first.\n", ILI9341_RED);
+				return;
+			}
+		}
+		
+		HTTPClient http;
+		http.begin("http://" + args[1]);
+		int httpCode = http.GET();
+
+		int size = http.getSize();
+		String payload = "[size too big]";
+		if (size < 65,536) {
+			payload = http.getString();
+		}
+
+		int len = payload.length();
+		if (len > 256) {
+			payload = payload.substring(0, 128) + "\n\n...\n\n" + payload.substring(len - 128, len);
+		}
+
+		http.end();
+
+		uint16_t color;
+		switch (httpCode / 100) {
+			case 1:
+				color = ILI9341_BLUE;
+				break;
+			case 2:
+				color = ILI9341_GREEN;
+				break;
+			case 3:
+				color = ILI9341_YELLOW;
+				break;
+			case 4:
+				color = ILI9341_ORANGE;
+				break;
+			case 5:
+				color = ILI9341_RED;
+				break;
+			default: color = ILI9341_WHITE;
+		}
+
+		print(String(httpCode), color);
+		print("\n");
+		print(String(payload));
+	} else if (cmd == "jpg") {
+		if (!checkArgsSize(args, 2)) return;
+
+		String target = resolvePath(args[1]);
+
+		if (!FatFS.exists(target)) {
+			print("Error: File not found.\n", ILI9341_RED);
+		} else {
+			tft.fillScreen(ILI9341_BLACK);
+			drawJPG(target);
+
+			while (true) {
+				char key = keyboard.getKey(true);
+				if (key == '*') {
+					clear();
+					break;
 				}
 			}
-			
-			HTTPClient http;
-			http.begin("http://" + args[1]);
-			int httpCode = http.GET();
-
-			int size = http.getSize();
-			String payload = "[size too big]";
-			if (size < 65,536) {
-				payload = http.getString();
-			}
-
-			int len = payload.length();
-			if (len > 256) {
-				payload = payload.substring(0, 128) + "\n\n...\n\n" + payload.substring(len - 128, len);
-			}
-
-			http.end();
-
-			uint16_t color;
-			switch (httpCode / 100) {
-				case 1:
-					color = ILI9341_BLUE;
-					break;
-				case 2:
-					color = ILI9341_GREEN;
-					break;
-				case 3:
-					color = ILI9341_YELLOW;
-					break;
-				case 4:
-					color = ILI9341_ORANGE;
-					break;
-				case 5:
-					color = ILI9341_RED;
-					break;
-				default: color = ILI9341_WHITE;
-			}
-
-			print(String(httpCode), color);
-			print("\n");
-			print(String(payload));
-		} else {
-			print("Wrong argument count.\n", ILI9341_RED);
 		}
-	} else if (cmd == "jpg") {
-		if (args.size() != 2) {
-            print("Please specify the path of the JPG file to be rendered.\n", ILI9341_RED);
-        } else {
-            String target = resolvePath(args[1]);
+	} else if (cmd == "anim") {
+		if (!checkArgsSize(args, 2)) return;
 
-            if (!FatFS.exists(target)) {
-                print("Error: File not found.\n", ILI9341_RED);
-            } else {
-				tft.fillScreen(ILI9341_BLACK);
-				drawJPG(target);
+		String target = resolvePath(args[1]);
 
-				while (true) {
+		if (!FatFS.exists(target)) {
+			print("Error: Directory not found.\n", ILI9341_RED);
+		} else {
+			Dir root = FatFS.openDir(target);
+
+			tft.fillScreen(ILI9341_BLACK);
+
+			while (true) {
+				while (root.next()) {
 					char key = keyboard.getKey(true);
 					if (key == '*') {
 						clear();
-						break;
+						return;
 					}
+
+					if (!root.isFile()) continue;
+
+					drawJPG(joinPaths(target, root.fileName()));
 				}
-            }
-		}
-	} else if (cmd == "anim") {
-		if (args.size() != 2) {
-            print("Please specify the directory of the animation.\n", ILI9341_RED);
-        } else {
-            String target = resolvePath(args[1]);
-
-            if (!FatFS.exists(target)) {
-                print("Error: Directory not found.\n", ILI9341_RED);
-            } else {
-				Dir root = FatFS.openDir(target);
-
-				tft.fillScreen(ILI9341_BLACK);
-
-				while (true) {
-					while (root.next()) {
-						char key = keyboard.getKey(true);
-						if (key == '*') {
-							clear();
-							return;
-						}
-
-						if (!root.isFile()) continue;
-
-						drawJPG(joinPaths(target, root.fileName()));
-					}
-					root.rewind();
-				}
-            }
+				root.rewind();
+			}
 		}
 	} else if (cmd == "draw") {
 		uint16_t color = ILI9341_BLACK;
